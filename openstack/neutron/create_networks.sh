@@ -1,4 +1,4 @@
-#!bin/bash
+#!/bin/bash
 
 # create the private network
 neutron net-create private-net  --provider:physical_network physnet2 --provider:network_type flat
