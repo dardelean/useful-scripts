@@ -1,0 +1,25 @@
+---
+- name: Install Nova compute driver and FreeRDP on Hyper-V
+  hosts: hyperv
+  tasks:
+    - name: Download the Nova driver installer
+      win_get_url:
+        url: https://cloudbase.it/downloads/HyperVNovaCompute_Newton_14_0_1.msi
+        dest: C:\Users\Administrator\Downloads\HyperVNovaCompute_Newton_14_0_1.msi
+
+    - name: Intall Nova MSI 
+      win_package:
+        path: C:\Users\Administrator\Downloads\HyperVNovaCompute_Newton_14_0_1.msi
+        product_id: '{520321AD-664C-49A1-A8CE-FAFB3C67FBF7}' 
+
+    - name: Download FreeRDP
+      win_get_url:
+        url: https://www.cloudbase.it/downloads/FreeRDPWebConnect.msi
+        dest: C:\Users\Administrator\Downloads\FreeRDPWebConnect.msi
+
+    - name: Install FreeRDP
+      win_package: 
+        path: C:\Users\Administrator\Downloads\FreeRDPWebConnect.msi
+        product_id: '{0935139D-41F6-40C1-A8C5-218DD93F8C76}' 
+
+
