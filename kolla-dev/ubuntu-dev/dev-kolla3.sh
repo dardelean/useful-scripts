@@ -3,14 +3,14 @@
 # Post deploy stuff
 
 function configure_ovs() {
-	sudo docker exec --privileged openvswitch_vswitchd ovs-vsctl add-br br-data
-	sudo docker exec --privileged openvswitch_vswitchd ovs-vsctl add-port br-data ens35
-	sudo docker exec --privileged openvswitch_vswitchd ovs-vsctl add-port br-data phy-br-data || true
-	sudo docker exec --privileged openvswitch_vswitchd ovs-vsctl set interface phy-br-data type=patch
-	sudo docker exec --privileged openvswitch_vswitchd ovs-vsctl add-port br-int int-br-data || true
-	sudo docker exec --privileged openvswitch_vswitchd ovs-vsctl set interface int-br-data type=patch
-	sudo docker exec --privileged openvswitch_vswitchd ovs-vsctl set interface phy-br-data options:peer=int-br-data
-	sudo docker exec --privileged openvswitch_vswitchd ovs-vsctl set interface int-br-data options:peer=phy-br-data
+	docker exec --privileged openvswitch_vswitchd ovs-vsctl add-br br-data
+	docker exec --privileged openvswitch_vswitchd ovs-vsctl add-port br-data ens35
+	docker exec --privileged openvswitch_vswitchd ovs-vsctl add-port br-data phy-br-data || true
+	docker exec --privileged openvswitch_vswitchd ovs-vsctl set interface phy-br-data type=patch
+	docker exec --privileged openvswitch_vswitchd ovs-vsctl add-port br-int int-br-data || true
+	docker exec --privileged openvswitch_vswitchd ovs-vsctl set interface int-br-data type=patch
+	docker exec --privileged openvswitch_vswitchd ovs-vsctl set interface phy-br-data options:peer=int-br-data
+	docker exec --privileged openvswitch_vswitchd ovs-vsctl set interface int-br-data options:peer=phy-br-data
 
 	for conf_file in /etc/kolla/neutron-server/ml2_conf.ini /etc/kolla/neutron-openvswitch-agent/ml2_conf.ini
 	do
@@ -41,6 +41,8 @@ EOF
 }
 
 function configure_networks() {
+    docker exec --privileged neutron_server pip install "networking-hyperv>=3.0.0,<4.0.0"
+
     PUBLIC_NET=public_net
     PUBLIC_SUBNET=public_subnet
 
@@ -71,6 +73,8 @@ function cirros_vhd() {
 	--disk-format vhd --container-format bare --file cirros-0.3.4-x86_64.vhdx cirros-gen1-vhdx
 	rm cirros-0.3.4-x86_64.vhdx
 }
+
+source /etc/kolla/admin-openrc.sh
 
 #configure_ovs
 
