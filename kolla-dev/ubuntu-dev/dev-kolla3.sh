@@ -1,10 +1,11 @@
 #!/bin/bash
+#set -e
 
 # Post deploy stuff
 
 function configure_ovs() {
 	docker exec --privileged openvswitch_vswitchd ovs-vsctl add-br br-data
-	docker exec --privileged openvswitch_vswitchd ovs-vsctl add-port br-data ens35
+	docker exec --privileged openvswitch_vswitchd ovs-vsctl add-port br-data eth2
 	docker exec --privileged openvswitch_vswitchd ovs-vsctl add-port br-data phy-br-data || true
 	docker exec --privileged openvswitch_vswitchd ovs-vsctl set interface phy-br-data type=patch
 	docker exec --privileged openvswitch_vswitchd ovs-vsctl add-port br-int int-br-data || true
@@ -41,11 +42,13 @@ EOF
 }
 
 function configure_networks() {
-    docker exec --privileged neutron_server pip install "networking-hyperv>=3.0.0,<4.0.0"
+    #docker exec --privileged neutron_server pip install "networking-hyperv>=3.0.0,<4.0.0"
 
     PUBLIC_NET=public_net
     PUBLIC_SUBNET=public_subnet
-
+    PRIVATE_NET=private_net
+    PRIVATE_SUBNET=private_subnet
+	
     neutron net-create $PUBLIC_NET \
     --router:external --provider:physical_network physnet1 --provider:network_type flat
 
@@ -53,8 +56,11 @@ function configure_networks() {
     --name $PUBLIC_SUBNET --allocation-pool start=192.168.10.100,end=192.168.10.150 \
     --disable-dhcp --gateway 192.168.0.1 192.168.0.0/16
 
-    neutron net-create private-net --provider:physical_network physnet2 --provider:network_type flat
-    neutron subnet-create private-net 10.10.10.0/24 --name private-subnet --allocation-pool start=10.10.10.50,end=10.10.10.200  --gateway 10.10.10.1
+    neutron net-create $PRIVATE_NET \
+    --provider:physical_network physnet2 --provider:network_type flat
+    
+    neutron subnet-create $PRIVATE_NET 10.10.10.0/24 --name $PRIVATE_SUBET \
+    --allocation-pool start=10.10.10.50,end=10.10.10.200  --gateway 10.10.10.1
 
 }
 
@@ -76,9 +82,9 @@ function cirros_vhd() {
 
 source /etc/kolla/admin-openrc.sh
 
-#configure_ovs
+configure_ovs
 
-#cirros_vhd
+cirros_vhd
 
 configure_networks
 configure_router

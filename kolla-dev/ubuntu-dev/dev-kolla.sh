@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 # host setup
 
 function set_up_networking() {
@@ -11,30 +13,30 @@ auto lo
 iface lo inet loopback
 
 # The primary network interface
-auto ens33
-iface ens33 inet static
+auto eth0
+iface eth0 inet static
     address 192.168.10.11
     netmask 255.255.0.0
     gateway 192.168.0.1
     dns-nameservers 8.8.8.8
 
 
-auto ens34
-iface ens34 inet manual
-up ip link set ens34 up
-up ip link set ens34 promisc on
-down ip link set ens34 promisc off
-down ip link set ens34 down
+auto eth1
+iface eth1 inet manual
+up ip link set eth1 up
+up ip link set eth1 promisc on
+down ip link set eth1 promisc off
+down ip link set eth1 down
 
-auto ens35
-iface ens35 inet manual
-up ip link set ens35 up
-up ip link set ens35 promisc on
-down ip link set ens35 promisc off
-down ip link set ens35 down
+auto eth2
+iface eth2 inet manual
+up ip link set eth2 up
+up ip link set eth2 promisc on
+down ip link set eth2 promisc off
+down ip link set eth2 down
 EOF
 
-	for iface in ens33 ens34 ens35
+	for iface in eth0 eth1 eth2
 	do
 		ifdown $iface || true
 		ifup $iface
