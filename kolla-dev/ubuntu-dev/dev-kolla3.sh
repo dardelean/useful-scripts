@@ -1,9 +1,14 @@
 #!/bin/bash
-#set -e
+set -e
 
 # Post deploy stuff
 
 function configure_ovs() {
+	docker exec --privileged neutron_server pip install --upgrade pip
+	docker exec --privileged neutron_server pip install wheel
+	docker exec --privileged neutron_server pip install "networking-hyperv>=3.0.0,<4.0.0"	
+	docker restart neutron_server
+
 	docker exec --privileged openvswitch_vswitchd ovs-vsctl add-br br-data
 	docker exec --privileged openvswitch_vswitchd ovs-vsctl add-port br-data eth2
 	docker exec --privileged openvswitch_vswitchd ovs-vsctl add-port br-data phy-br-data || true
@@ -12,44 +17,28 @@ function configure_ovs() {
 	docker exec --privileged openvswitch_vswitchd ovs-vsctl set interface int-br-data type=patch
 	docker exec --privileged openvswitch_vswitchd ovs-vsctl set interface phy-br-data options:peer=int-br-data
 	docker exec --privileged openvswitch_vswitchd ovs-vsctl set interface int-br-data options:peer=phy-br-data
+}
 
+function configure_neutron() { 
 	for conf_file in /etc/kolla/neutron-server/ml2_conf.ini /etc/kolla/neutron-openvswitch-agent/ml2_conf.ini
 	do
-        	cat << EOF > $conf_file
-[ml2]
-type_drivers = flat,vlan
-tenant_network_types = flat,vlan
-mechanism_drivers = openvswitch,hyperv
-extension_drivers = port_security
-
-[ml2_type_vlan]
-network_vlan_ranges = physnet2:500:2000
-
-[ml2_type_flat]
-flat_networks = physnet1, physnet2
-
-[securitygroup]
-firewall_driver = neutron.agent.linux.iptables_firewall.OVSHybridIptablesFirewallDriver
-
-[ovs]
-bridge_mappings = physnet1:br-ex,physnet2:br-data
-ovsdb_connection = tcp:192.168.10.11:6640
-local_ip = 192.168.10.11
-EOF
-	done
+        	sed -i '/bridge_mappings/c\bridge_mappings = physnet1:br-ex,physnet2:br-data' $conf_file
+        	sed -i '/flat_networks/c\flat_networks = physnet1,physnet2' $conf_file
+        	sed -i '/network_vlan_ranges/c\network_vlan_ranges = physnet2:500:2000' $conf_file
+	done	
 
 	docker restart neutron_server neutron_openvswitch_agent
 }
 
 function configure_networks() {
-    #docker exec --privileged neutron_server pip install "networking-hyperv>=3.0.0,<4.0.0"
-
     PUBLIC_NET=public_net
     PUBLIC_SUBNET=public_subnet
     PRIVATE_NET=private_net
     PRIVATE_SUBNET=private_subnet
+    PRIVATE_NET_VLAN=private_net_vlan
+    PRIVATE_SUBNET_VLAN=private_subnet_vlan
 	
-    neutron net-create $PUBLIC_NET \
+    neutron net-create $PUBLIC_NET  \
     --router:external --provider:physical_network physnet1 --provider:network_type flat
 
     neutron subnet-create $PUBLIC_NET \
@@ -59,8 +48,15 @@ function configure_networks() {
     neutron net-create $PRIVATE_NET \
     --provider:physical_network physnet2 --provider:network_type flat
     
-    neutron subnet-create $PRIVATE_NET 10.10.10.0/24 --name $PRIVATE_SUBET \
+    neutron subnet-create $PRIVATE_NET 10.10.10.0/24 --name $PRIVATE_SUBNET \
     --allocation-pool start=10.10.10.50,end=10.10.10.200  --gateway 10.10.10.1
+
+
+    neutron net-create $PRIVATE_NET_VLAN --provider:segmentation_id 500 \
+    --provider:physical_network physnet2 --provider:network_type vlan
+
+    neutron subnet-create $PRIVATE_NET_VLAN 10.10.20.0/24 --name $PRIVATE_SUBNET_VLAN \
+    --allocation-pool start=10.10.20.50,end=10.10.20.200  --gateway 10.10.20.1
 
 }
 
@@ -69,6 +65,7 @@ function configure_router() {
 
     neutron router-create $PUBLIC_ROUTER
     neutron router-interface-add $PUBLIC_ROUTER $PRIVATE_SUBNET
+    neutron router-interface-add $PUBLIC_ROUTER $PRIVATE_SUBNET_VLAN
     neutron router-gateway-set $PUBLIC_ROUTER $PUBLIC_NET
 }
 
@@ -83,6 +80,7 @@ function cirros_vhd() {
 source /etc/kolla/admin-openrc.sh
 
 configure_ovs
+configure_neutron
 
 cirros_vhd
 
