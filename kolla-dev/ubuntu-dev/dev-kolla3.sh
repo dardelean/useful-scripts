@@ -42,8 +42,8 @@ function configure_networks() {
     --router:external --provider:physical_network physnet1 --provider:network_type flat
 
     neutron subnet-create $PUBLIC_NET \
-    --name $PUBLIC_SUBNET --allocation-pool start=192.168.10.100,end=192.168.10.150 \
-    --disable-dhcp --gateway 192.168.0.1 192.168.0.0/16
+    --name $PUBLIC_SUBNET --allocation-pool start=192.168.100.100,end=192.168.100.150 \
+    --disable-dhcp --gateway 192.168.100.1 192.168.100.0/24
 
     neutron net-create $PRIVATE_NET \
     --provider:physical_network physnet2 --provider:network_type flat

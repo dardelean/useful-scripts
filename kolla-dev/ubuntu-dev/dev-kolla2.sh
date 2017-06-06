@@ -13,18 +13,14 @@ function enable_hyperv() {
 }
 
 function add_hyperv() {
-	if ! grep -q "winrm" /usr/local/share/kolla-ansible/ansible/inventory/all-in-one
+	if ! grep -q "192.168.100.14" /usr/local/share/kolla-ansible/ansible/inventory/all-in-one
 	then
 		sed -i '/hyperv]/a\
-192.168.10.14' /usr/local/share/kolla-ansible/ansible/inventory/all-in-one
- 
- 		sed -i '/hyperv:vars/a\
-ansible_user='$HYPERV_USERNAME' \
-ansible_password='$HYPERV_PASSWORD' \
-ansible_port=5986 \
-ansible_connection=winrm \
-ansible_winrm_server_cert_validation=ignore \
-\ ' /usr/local/share/kolla-ansible/ansible/inventory/all-in-one
+192.168.100.14' /usr/local/share/kolla-ansible/ansible/inventory/all-in-one
+		#sed -i '/hyperv_host/d' /usr/local/share/kolla-ansible/ansible/inventory/all-in-one
+		sed -i '/hyperv_host/d' /usr/local/share/kolla-ansible/ansible/inventory/all-in-one 
+ 		sed -i '/ansible_user/c\ansible_user='$HYPERV_USERNAME'' /usr/local/share/kolla-ansible/ansible/inventory/all-in-one
+                sed -i '/ansible_password/c\ansible_password='$HYPERV_PASSWORD'' /usr/local/share/kolla-ansible/ansible/inventory/all-in-one
 	fi
 
 }
@@ -62,7 +58,7 @@ function enable_cinder() {
 }
 
 KOLLA_OPENSTACK_VERSION=4.0.0
-KOLLA_INTERNAL_VIP_ADDRESS=192.168.10.13
+KOLLA_INTERNAL_VIP_ADDRESS=192.168.100.13
 DOCKER_NAMESPACE=dardelean
 ADMIN_PASSWORD=admin
 HYPERV_USERNAME=Administrator
@@ -94,8 +90,8 @@ sed -i '/keystone_admin_password/c\keystone_admin_password: "'$ADMIN_PASSWORD'"'
 systemctl restart docker
 systemctl enable docker
 
-#set_up_cinder
-#enable_cinder
+set_up_cinder
+enable_cinder
 enable_hyperv
 
 #kolla-ansible bootstrap-servers
