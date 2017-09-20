@@ -2,25 +2,42 @@
 
 set -e
 
-# Kolla setup
+VSWITCH="ext-vswitch"
+MSI_URL="https://cloudbase.it/downloads/HyperVNovaCompute_Pike_16_0_0.msi"
+HYPERV_HOST=192.168.100.101
+KOLLA_OPENSTACK_VERSION=5.0.0
+KOLLA_INTERNAL_VIP_ADDRESS=192.168.100.102
+INSTALL_TYPE="source"
+DOCKER_NAMESPACE=""
+ADMIN_PASSWORD=""
+HYPERV_USERNAME=""
+HYPERV_PASSWORD=""
+GIT_KOLLA_REPO=https://github.com/openstack/kolla.git
+GIT_KOLLA_ANSIBLE_REPO=https://github.com/openstack/kolla-ansible.git
+INVENTORY_FILE=/usr/local/share/kolla-ansible/ansible/inventory/all-in-one
+GIT_BRANCH=stable/pike
 
+
+# Kolla setup
 function enable_hyperv() {
 	sed -i '/enable_hyperv/c\enable_hyperv: "yes"' /etc/kolla/globals.yml
 	sed -i '/hyperv_username/c\hyperv_username: "'$HYPERV_USERNAME'"' /etc/kolla/globals.yml
 	sed -i '/hyperv_password/c\hyperv_password: "'$HYPERV_PASSWORD'"' /etc/kolla/globals.yml
-	sed -i '/vswitch_name/c\vswitch_name: "v-switch"' /etc/kolla/globals.yml
-	sed -i '/nova_msi_url/c\nova_msi_url: "https://cloudbase.it/downloads/HyperVNovaCompute_Ocata_15_0_0.msi"' /etc/kolla/globals.yml
+	sed -i '/vswitch_name/c\vswitch_name: "'$VSWITCH'"' /etc/kolla/globals.yml
+	sed -i '/nova_msi_url/c\nova_msi_url: "'$MSI_URL'"' /etc/kolla/globals.yml
 }
 
 function add_hyperv() {
-	if ! grep -q "192.168.100.14" /usr/local/share/kolla-ansible/ansible/inventory/all-in-one
+	if ! grep -q "'$HYPERV_HOST'" $INVENTORY_FILE
 	then
 		sed -i '/hyperv]/a\
-192.168.100.14' /usr/local/share/kolla-ansible/ansible/inventory/all-in-one
-		#sed -i '/hyperv_host/d' /usr/local/share/kolla-ansible/ansible/inventory/all-in-one
-		sed -i '/hyperv_host/d' /usr/local/share/kolla-ansible/ansible/inventory/all-in-one 
- 		sed -i '/ansible_user/c\ansible_user='$HYPERV_USERNAME'' /usr/local/share/kolla-ansible/ansible/inventory/all-in-one
-                sed -i '/ansible_password/c\ansible_password='$HYPERV_PASSWORD'' /usr/local/share/kolla-ansible/ansible/inventory/all-in-one
+'$HYPERV_HOST'' $INVENTORY_FILE
+		sed -i '/hyperv_host/d' $INVENTORY_FILE 
+ 		sed -i '/ansible_user/c\ansible_user='$HYPERV_USERNAME'' $INVENTORY_FILE
+                sed -i '/ansible_password/c\ansible_password='$HYPERV_PASSWORD'' $INVENTORY_FILE
+		sed -i '/ansible_port/c\ansible_port=5986' $INVENTORY_FILE
+		sed -i '/ansible_connection/c\ansible_connection=winrm' $INVENTORY_FILE
+		sed -i '/ansible_winrm_server_cert_validation/c\ansible_winrm_server_cert_validation=ignore' $INVENTORY_FILE
 	fi
 
 }
@@ -37,7 +54,7 @@ function set_up_cinder() {
     		vgcreate cinder-volumes /dev/loop2
 
 		# make this reboot persistent
-    		echo "losetup /dev/loop2 /var/cinder/cinder-volumes.img" >> /etc/rc.local
+    		echo "losetup /dev/loop2 /var/cinder/cinder-volumes.img" > /etc/rc.local
     		chmod +x /etc/rc.local
 	
 
@@ -57,25 +74,29 @@ function enable_cinder() {
 	sed -i '/cinder_volume_group/c\cinder_volume_group: "cinder-volumes"' /etc/kolla/globals.yml
 }
 
-KOLLA_OPENSTACK_VERSION=4.0.0
-KOLLA_INTERNAL_VIP_ADDRESS=192.168.100.13
-DOCKER_NAMESPACE=dardelean
-ADMIN_PASSWORD=admin
-HYPERV_USERNAME=Administrator
-HYPERV_PASSWORD=Passw0rd
-
 
 # Install Kolla
-cd /mnt/smb
+# Install Kolla and Kolla-ansible
+if [ ! -d /root/kolla ]
+then
+	git clone $GIT_KOLLA_REPO -b $GIT_BRANCH /root/kolla/
+fi
 
-pip install ./kolla
-pip install ./kolla-ansible
-cp -r kolla-ansible/etc/kolla /etc/
+if [ ! -d /root/kolla-ansible ]
+then
+	git clone $GIT_KOLLA_ANSIBLE_REPO -b $GIT_BRANCH /root/kolla-ansible/
+fi
+
+pip install /root/kolla 2> /dev/null
+pip install /root/kolla-ansible 2> /dev/null
+
+cp -r /root/kolla-ansible/etc/kolla /etc/
+
 
 # Enable various stuff for Kolla
 sed -i '/kolla_base_distro:/c\kolla_base_distro: "ubuntu"' /etc/kolla/globals.yml
-sed -i '/kolla_install_type:/c\kolla_install_type: "source"' /etc/kolla/globals.yml
-#sed -i '/docker_namespace/i docker_namespace: "'$DOCKER_NAMESPACE'"' /etc/kolla/globals.yml
+sed -i '/kolla_install_type:/c\kolla_install_type: "'$INSTALL_TYPE'"' /etc/kolla/globals.yml
+sed -i '/docker_namespace/i docker_namespace: "'$DOCKER_NAMESPACE'"' /etc/kolla/globals.yml
 sed -i '/openstack_release:/c\openstack_release: "'$KOLLA_OPENSTACK_VERSION'"' /etc/kolla/globals.yml
 sed -i 's/^kolla_internal_vip_address:\s.*$/kolla_internal_vip_address: "'$KOLLA_INTERNAL_VIP_ADDRESS'"/g' /etc/kolla/globals.yml
 sed -i '/#network_interface:/c\network_interface: "eth0"' /etc/kolla/globals.yml
@@ -94,16 +115,16 @@ set_up_cinder
 enable_cinder
 enable_hyperv
 
-#kolla-ansible bootstrap-servers
-#kolla-ansible pull
+kolla-ansible bootstrap-servers
+kolla-ansible pull
 kolla-genpwd
 
-#kolla-ansible prechecks -i /usr/local/share/kolla-ansible/ansible/inventory/all-in-one
+kolla-ansible prechecks -i $INVENTORY_FILE
 
 add_hyperv
 
-kolla-ansible deploy -i /usr/local/share/kolla-ansible/ansible/inventory/all-in-one
+kolla-ansible deploy -i $INVENTORY_FILE
 
-kolla-ansible post-deploy -i /usr/local/share/kolla-ansible/ansible/inventory/all-in-one
+kolla-ansible post-deploy -i $INVENTORY_FILE
 
 #./dev-kolla3.sh

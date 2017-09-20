@@ -2,8 +2,11 @@
 
 set -e
 
-# host setup
+HOST_IP=192.168.100.100
+HOST_GATEWAY=192.168.100.1
+HOST_NETMASK=255.255.255.0
 
+# host setup
 function set_up_networking() {
 	tee /etc/network/interfaces <<EOF
 source /etc/network/interfaces.d/*
@@ -15,9 +18,9 @@ iface lo inet loopback
 # The primary network interface
 auto eth0
 iface eth0 inet static
-    address 192.168.100.11
-    netmask 255.255.255.0
-    gateway 192.168.100.1
+    address $HOST_IP
+    netmask $HOST_NETMASK
+    gateway $HOST_NETMASK
     dns-nameservers 8.8.8.8
 
 
@@ -61,10 +64,11 @@ function install_packages () {
 	pip install "pywinrm>=0.2.2"
 }
 
-set_up_networking
+#set_up_networking
 install_packages
 
 
+# config docker
 mkdir -p /etc/systemd/system/docker.service.d
 tee /etc/systemd/system/docker.service.d/kolla.conf <<-'EOF'
 [Service]
