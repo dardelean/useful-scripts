@@ -10,9 +10,6 @@ autoinstall:
       version: 2
       ethernets:
         eth0:
-          match:
-            name: enp1s0
-          set-name: eth0
           addresses:
             - 192.168.100.3/24
           gateway4: 192.168.100.1
@@ -20,3 +17,6 @@ autoinstall:
             addresses: [8.8.8.8]
   late-commands:
     - echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/ubuntu
+    - sed -ie 's/GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="net.ifnames=0 ipv6.disable=1 biosdevname=0"/' /target/etc/default/grub
+    - curtin in-target --target /target update-grub2
+    - swapoff -a
